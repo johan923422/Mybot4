@@ -1,4 +1,0 @@
-pyrogram==2.0.104
-tgcrypto==1.4.3
-openai==1.32.0
-deep-translator==1.10.1
