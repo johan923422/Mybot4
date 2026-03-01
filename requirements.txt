@@ -1,5 +1,0 @@
-pyrogram==2.0.106
-tgcrypto==1.4.2
-openai
-deep-translator
-python-dotenv
