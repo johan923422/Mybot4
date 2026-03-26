@@ -1,13 +1,19 @@
 import os
 import asyncio
 import json
+import html
 from pyrogram import Client, filters
 from pyrogram.types import ChatPermissions, Message
 from pyrogram.enums import ParseMode
 from deep_translator import GoogleTranslator
 
 # ---------------- CONFIG ----------------
-TOKENS = [os.getenv("BOT1"), os.getenv("BOT2"), os.getenv("BOT3"), os.getenv("BOT4")]
+TOKENS = [t for t in [
+    os.getenv("BOT1"),
+    os.getenv("BOT2"),
+    os.getenv("BOT3"),
+    os.getenv("BOT4")
+] if t]
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 OWNER_ID = int(os.getenv("OWNER_ID"))
@@ -108,7 +114,14 @@ async def run_bot(token: str):
                     data["GP_CHAT_IDS"].append(message.chat.id)
                     save_data(data)
             try:
-                photo = await client.download_media(user.photo.big_file_id)
+                if user.photo:
+                    await client.send_photo(
+                        message.chat.id,
+                        user.photo.big_file_id,
+                        caption=...
+                    )
+                else:
+                    await message.reply_text(...)
                 await client.send_photo(message.chat.id, photo, caption=f"{mention} ဖာသည်မသားဝင်လာပြီ\n🆔 {user.id}")
             except:
                 await message.reply_text(f"{mention} ဖာသည်မသားဝင်လာပြီ\n🆔 {user.id}")
@@ -119,7 +132,14 @@ async def run_bot(token: str):
         user = message.left_chat_member
         mention = f"<a href='tg://user?id={user.id}'>{user.first_name}</a>"
         try:
-            photo = await client.download_media(user.photo.big_file_id)
+            if user.photo:
+                await client.send_photo(
+                    message.chat.id,
+                    user.photo.big_file_id,
+                    caption=...
+                )
+            else:
+                await message.reply_text(...)
             await client.send_photo(message.chat.id, photo, caption=f"{mention} ဖာသည်မသားထွက်သွားပြီ\n🆔 {user.id}")
         except:
             await message.reply_text(f"{mention} ဖာသည်မသားထွက်သွားပြီ\n🆔 {user.id}")
@@ -127,7 +147,7 @@ async def run_bot(token: str):
     # -------- HANDLER --------
     @app.on_message(filters.text)
     async def handler(client, message: Message):
-        nonlocal data
+    data = load_data()
         text = message.text or ""
         chat_id = message.chat.id
         user_id = message.from_user.id
