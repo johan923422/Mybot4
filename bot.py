@@ -182,65 +182,138 @@ Info - show user info(reply)
 </pre>""", parse_mode=ParseMode.HTML)
             return
 
-        # ---------------- COMMANDS ----------------
-        if text.startswith("All"): await call_members_online(client,message,"All",text[3:].strip())
-        elif text.startswith("Callone"): await call_members_online(client,message,"Callone",text[7:].strip())
-        elif text.startswith("Call"): await call_members_online(client,message,"Call",text[4:].strip())
-        elif text == "ရပ်": call_running[chat_id]=False; await message.delete(); await message.reply_text("Call ရပ်ပြီးပါပြီသခင်")
-        elif text in ["mtရိုက်","ရိုက်သတ်"] and message.reply_to_message and is_admin:
-            await message.delete()
-            user = message.reply_to_message.from_user
-            spam_running[chat_id]=True
-            async def spam_worker(tag_user: bool):
-                while spam_running.get(chat_id):
-                    for line in data["SPAM_TEXT"]:
-                        if not spam_running.get(chat_id): break
-                        msg = f"<a href='tg://user?id={user.id}'>{user.first_name}</a>\n{line}" if tag_user else line
-                        await app.send_message(chat_id,msg,parse_mode=ParseMode.HTML)
-                        await asyncio.sleep(data["spam_speed"][chat_id])
-            asyncio.create_task(spam_worker(tag_user=text=="mtရိုက်"))
-        elif text == "ခွင့်လွှတ်လိုက်" and is_admin: await message.delete(); spam_running[chat_id]=False; await message.reply_text("သခင့်အမိန့်အရဖာသည်မသားကိုလွတ်မြောက်ခွင့်ပေးလိုက်ပါပြီ")
-        elif text.startswith("စာထည့်") and is_admin: new_text = text.replace("စာထည့်","",1).strip(); await message.delete(); data["SPAM_TEXT"].append(new_text); save_data(data); await message.reply_text(f"ထည့်ပြီးပါပြီ:\n{new_text}")
-        elif text.startswith("စာဖြတ်") and is_admin: remove_text = text.replace("စာဖြတ်","",1).strip(); await message.delete(); 
-            if remove_text in data["SPAM_TEXT"]: data["SPAM_TEXT"].remove(remove_text); save_data(data); await message.reply_text(f"ဖြတ်ပြီးပါပြီ:\n{remove_text}") 
-            else: await message.reply_text("မတွေ့ပါ။")
-        elif text == "စာlist" and is_admin: await message.delete(); await message.reply_text(f"<pre>{chr(10).join(data['SPAM_TEXT'])}</pre>",parse_mode=ParseMode.HTML)
-        elif text.startswith("အရှိန်") and is_admin: await message.delete(); 
-            try: speed = float(text.split()[1]); 
-            if 0.1<=speed<=10: data["spam_speed"][chat_id]=speed; save_data(data); await message.reply_text(f"Spam speed {speed} sec set") 
-            except: await message.reply_text("0.1 - 10 sec only")
-        elif text.startswith("ဘာသာပြန်") and message.reply_to_message and is_admin: await message.delete(); await message.reply_text(f"🌐 {translator.translate(message.reply_to_message.text)}")
-        elif text.startswith("စာဖြန့်") and message.reply_to_message and is_admin: await message.delete(); content=message.reply_to_message.text; chat_ids=data.get("GP_CHAT_IDS",[]); async for dialog in client.get_dialogs(): 
-            if dialog.chat.type in ["group","supergroup"]: 
-                if dialog.chat.id not in chat_ids: chat_ids.append(dialog.chat.id) 
-            for gp_id in chat_ids: 
-                try: await app.send_message(gp_id,f"<pre>{content}</pre>",parse_mode=ParseMode.HTML); await asyncio.sleep(0.5)
-                except: pass
-        elif text == "Chatlist" and is_admin: await message.delete(); msg="<b>📡 Connected Groups</b>\n\n"; chat_ids=data.get("GP_CHAT_IDS",[]); async for dialog in client.get_dialogs(): 
-            if dialog.chat.type in ["group","supergroup"]: 
-                if dialog.chat.id not in chat_ids: chat_ids.append(dialog.chat.id) 
-            for gid in chat_ids: 
-                try: chat=await client.get_chat(gid); msg+=f"• <a href='https://t.me/{chat.username}'>{chat.title}</a>\n" if chat.username else f"• {chat.title}\n"
-                except: pass
-            await message.reply_text(msg,parse_mode=ParseMode.HTML)
-        elif text == "List" and is_admin: await message.delete(); msg="<b>📜 Bot Admins</b>\n\n"; owner=await client.get_users(OWNER_ID); msg+=f"👑 Owner: <a href='tg://user?id={owner.id}'>{owner.first_name}</a>\n\n"; msg+="🔹 Admins:\n"; 
-            for uid in data["BOT_ADMINS"]: user=await client.get_users(uid); msg+=f"• <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
-            await message.reply_text(msg,parse_mode=ParseMode.HTML)
-        elif text == "ပိတ်ထား" and message.reply_to_message and is_admin: await message.delete(); await app.restrict_chat_member(chat_id,message.reply_to_message.from_user.id,ChatPermissions(can_send_messages=False))
-        elif text == "လက်မရားနဲ့" and message.reply_to_message and is_admin: await message.delete(); await app.restrict_chat_member(chat_id,message.reply_to_message.from_user.id,ChatPermissions(can_send_messages=True))
-        elif text == "ပြန်မလာနဲ့" and message.reply_to_message and is_admin: await message.delete(); await app.ban_chat_member(chat_id,message.reply_to_message.from_user.id)
-        elif text == "ပြန်ဝင်ခွင့်ပြု" and message.reply_to_message and is_admin: await message.delete(); await app.unban_chat_member(chat_id,message.reply_to_message.from_user.id)
-        elif text == "ထည့်" and message.reply_to_message and user_id==OWNER_ID: await message.delete(); data["BOT_ADMINS"].append(message.reply_to_message.from_user.id); save_data(data)
-        elif text == "ဖြုတ်" and message.reply_to_message and user_id==OWNER_ID: await message.delete(); 
-            if message.reply_to_message.from_user.id in data["BOT_ADMINS"]: data["BOT_ADMINS"].remove(message.reply_to_message.from_user.id); save_data(data)
-        elif text == "Info" and message.reply_to_message and is_admin: await message.delete(); await message.reply_text(f"👤 {message.reply_to_message.from_user.first_name}\n🆔 {message.reply_to_message.from_user.id}")
+# ---------------- COMMANDS ----------------
+if text.startswith("All"):
+    await call_members_online(client, message, "All", text[3:].strip())
+elif text.startswith("Callone"):
+    await call_members_online(client, message, "Callone", text[7:].strip())
+elif text.startswith("Call"):
+    await call_members_online(client, message, "Call", text[4:].strip())
+elif text == "ရပ်":
+    call_running[chat_id] = False
+    await message.delete()
+    await message.reply_text("Call ရပ်ပြီးပါပြီသခင်")
+elif text in ["mtရိုက်", "ရိုက်သတ်"] and message.reply_to_message and is_admin:
+    await message.delete()
+    user = message.reply_to_message.from_user
+    spam_running[chat_id] = True
 
-    await app.start()
-    print(f"Bot started: {token}")
-    await asyncio.Event().wait()
+    async def spam_worker(tag_user: bool):
+        while spam_running.get(chat_id):
+            for line in data["SPAM_TEXT"]:
+                if not spam_running.get(chat_id):
+                    break
+                msg = f"<a href='tg://user?id={user.id}'>{user.first_name}</a>\n{line}" if tag_user else line
+                await app.send_message(chat_id, msg, parse_mode=ParseMode.HTML)
+                await asyncio.sleep(data["spam_speed"][chat_id])
 
-# ---------------- RUN ALL ----------------
-async def main():
-    await asyncio.gather(*(run_bot(token) for token in TOKENS if token))
+    asyncio.create_task(spam_worker(tag_user=text=="mtရိုက်"))
+elif text == "ခွင့်လွှတ်လိုက်" and is_admin:
+    await message.delete()
+    spam_running[chat_id] = False
+    await message.reply_text("သခင့်အမိန့်အရဖာသည်မသားကိုလွတ်မြောက်ခွင့်ပေးလိုက်ပါပြီ")
+elif text.startswith("စာထည့်") and is_admin:
+    new_text = text.replace("စာထည့်", "", 1).strip()
+    await message.delete()
+    data["SPAM_TEXT"].append(new_text)
+    save_data(data)
+    await message.reply_text(f"ထည့်ပြီးပါပြီ:\n{new_text}")
+elif text.startswith("စာဖြတ်") and is_admin:
+    remove_text = text.replace("စာဖြတ်", "", 1).strip()
+    await message.delete()
+    if remove_text in data["SPAM_TEXT"]:
+        data["SPAM_TEXT"].remove(remove_text)
+        save_data(data)
+        await message.reply_text(f"ဖြတ်ပြီးပါပြီ:\n{remove_text}")
+    else:
+        await message.reply_text("မတွေ့ပါ။")
+elif text == "စာlist" and is_admin:
+    await message.delete()
+    await message.reply_text(f"<pre>{chr(10).join(data['SPAM_TEXT'])}</pre>", parse_mode=ParseMode.HTML)
+elif text.startswith("အရှိန်") and is_admin:
+    await message.delete()
+    try:
+        speed = float(text.split()[1])
+        if 0.1 <= speed <= 10:
+            data["spam_speed"][chat_id] = speed
+            save_data(data)
+            await message.reply_text(f"Spam speed {speed} sec set")
+    except:
+        await message.reply_text("0.1 - 10 sec only")
+elif text.startswith("ဘာသာပြန်") and message.reply_to_message and is_admin:
+    await message.delete()
+    translated_text = translator.translate(message.reply_to_message.text)
+    await message.reply_text(f"🌐 {translated_text}")
+elif text.startswith("စာဖြန့်") and message.reply_to_message and is_admin:
+    await message.delete()
+    content = message.reply_to_message.text
+    chat_ids = data.get("GP_CHAT_IDS", [])
+    async for dialog in client.get_dialogs():
+        if dialog.chat.type in ["group", "supergroup"]:
+            if dialog.chat.id not in chat_ids:
+                chat_ids.append(dialog.chat.id)
+    for gp_id in chat_ids:
+        try:
+            await app.send_message(gp_id, f"<pre>{content}</pre>", parse_mode=ParseMode.HTML)
+            await asyncio.sleep(0.5)
+        except:
+            pass
+elif text == "Chatlist" and is_admin:
+    await message.delete()
+    msg = "<b>📡 Connected Groups</b>\n\n"
+    chat_ids = data.get("GP_CHAT_IDS", [])
+    async for dialog in client.get_dialogs():
+        if dialog.chat.type in ["group", "supergroup"]:
+            if dialog.chat.id not in chat_ids:
+                chat_ids.append(dialog.chat.id)
+    for gid in chat_ids:
+        try:
+            chat = await client.get_chat(gid)
+            msg += f"• <a href='https://t.me/{chat.username}'>{chat.title}</a>\n" if chat.username else f"• {chat.title}\n"
+        except:
+            pass
+    await message.reply_text(msg, parse_mode=ParseMode.HTML)
+elif text == "List" and is_admin:
+    await message.delete()
+    msg = "<b>📜 Bot Admins</b>\n\n"
+    owner = await client.get_users(OWNER_ID)
+    msg += f"👑 Owner: <a href='tg://user?id={owner.id}'>{owner.first_name}</a>\n\n"
+    msg += "🔹 Admins:\n"
+    for uid in data["BOT_ADMINS"]:
+        user = await client.get_users(uid)
+        msg += f"• <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
+    await message.reply_text(msg, parse_mode=ParseMode.HTML)
+elif text == "ပိတ်ထား" and message.reply_to_message and is_admin:
+    await message.delete()
+    await app.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, ChatPermissions(can_send_messages=False))
+elif text == "လက်မရားနဲ့" and message.reply_to_message and is_admin:
+    await message.delete()
+    await app.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, ChatPermissions(can_send_messages=True))
+elif text == "ပြန်မလာနဲ့" and message.reply_to_message and is_admin:
+    await message.delete()
+    await app.ban_chat_member(chat_id, message.reply_to_message.from_user.id)
+elif text == "ပြန်ဝင်ခွင့်ပြု" and message.reply_to_message and is_admin:
+    await message.delete()
+    await app.unban_chat_member(chat_id, message.reply_to_message.from_user.id)
+elif text == "ထည့်" and message.reply_to_message and user_id == OWNER_ID:
+    await message.delete()
+    data["BOT_ADMINS"].append(message.reply_to_message.from_user.id)
+    save_data(data)
+elif text == "ဖြုတ်" and message.reply_to_message and user_id == OWNER_ID:
+    await message.delete()
+    if message.reply_to_message.from_user.id in data["BOT_ADMINS"]:
+        data["BOT_ADMINS"].remove(message.reply_to_message.from_user.id)
+        save_data(data)
+elif text == "Info" and message.reply_to_message and is_admin:
+    await message.delete()
+    await message.reply_text(f"👤 {message.reply_to_message.from_user.first_name}\n🆔 {message.reply_to_message.from_user.id}")
 
+    await app.start()  
+    print(f"Bot started: {token}")  
+    await asyncio.Event().wait()  
+  
+# ---------------- RUN ALL ----------------  
+async def main():  
+    await asyncio.gather(*(run_bot(token) for token in TOKENS if token))  
+  
 asyncio.run(main())
