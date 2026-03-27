@@ -25,7 +25,7 @@ spam_running = {}
 call_running = {}
 
 # ---------------- HELPER ----------------
-async def is_bot_admin_or_owner(client, chat_id: int, user_id: int, bot_admins: list):
+async def is_admin_or_owner(client, chat_id: int, user_id: int, bot_admins: list):
     """
     Personal chat or group chat, only BOT_ADMINS or OWNER can use the bot
     """
@@ -147,7 +147,7 @@ async def run_bot(token: str):
             data["spam_speed"][chat_id] = 0.5
 
         # -------- FILTER --------
-        is_admin = await is_bot_admin_or_owner(client, chat_id, user_id, data["BOT_ADMINS"])
+        is_admin = await is_admin_or_owner(client, chat_id, user_id, data["BOT_ADMINS"])
         if not is_admin:
             # Forward check
             if message.forward_from or message.forward_from_chat:
