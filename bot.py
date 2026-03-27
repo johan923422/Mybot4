@@ -139,7 +139,7 @@ async def run_bot(token: str):
             data["spam_speed"][chat_id] = 0.5
 
         # -------- FILTER --------
-        is_admin = await is_group_admin(client, chat_id, user_id)
+        is_admin = await is_bot_admin_or_owner(client, chat_id, user_id)
         if not is_admin:
             # Forward check
             if message.forward_from or message.forward_from_chat:
