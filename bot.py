@@ -25,10 +25,10 @@ spam_running = {}
 call_running = {}
 
 # ---------------- HELPER FUNCTIONS ----------------
-def is_admin_or_owner(user_id: int, admins: list):
+def is_bot_admin_or_owner(user_id: int, admins: list):
     return user_id == OWNER_ID or user_id in admins
 
-async def is_group_admin(client, chat_id: int, user_id: int):
+async def is_bot_admin_or_owner(client, chat_id: int, user_id: int):
     member = await client.get_chat_member(chat_id, user_id)
     return member.status in ["administrator", "creator"]
 
