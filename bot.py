@@ -1,7 +1,6 @@
 import os
 import asyncio
 import json
-import html
 from pyrogram import Client, filters
 from pyrogram.types import ChatPermissions, Message
 from pyrogram.enums import ParseMode
@@ -114,17 +113,9 @@ async def run_bot(token: str):
                     data["GP_CHAT_IDS"].append(message.chat.id)
                     save_data(data)
             try:
-                if user.photo:
-                    await client.send_photo(
-                        message.chat.id,
-                        user.photo.big_file_id,
-                        caption=...
-                    )
-                else:
-                    await message.reply_text(...)
-                await client.send_photo(message.chat.id, photo, caption=f"{mention} ဖာသည်မသားဝင်လာပြီ\n🆔 {user.id}")
-            except:
                 await message.reply_text(f"{mention} ဖာသည်မသားဝင်လာပြီ\n🆔 {user.id}")
+            except:
+                pass
 
     # -------- Goodbye --------
     @app.on_message(filters.left_chat_member)
@@ -132,22 +123,14 @@ async def run_bot(token: str):
         user = message.left_chat_member
         mention = f"<a href='tg://user?id={user.id}'>{user.first_name}</a>"
         try:
-            if user.photo:
-                await client.send_photo(
-                    message.chat.id,
-                    user.photo.big_file_id,
-                    caption=...
-                )
-            else:
-                await message.reply_text(...)
-            await client.send_photo(message.chat.id, photo, caption=f"{mention} ဖာသည်မသားထွက်သွားပြီ\n🆔 {user.id}")
-        except:
             await message.reply_text(f"{mention} ဖာသည်မသားထွက်သွားပြီ\n🆔 {user.id}")
+        except:
+            pass
 
     # -------- HANDLER --------
     @app.on_message(filters.text)
     async def handler(client, message: Message):
-    data = load_data()
+        data = load_data()
         text = message.text or ""
         chat_id = message.chat.id
         user_id = message.from_user.id
@@ -169,7 +152,7 @@ async def run_bot(token: str):
                         await message.delete()
                         return
 
-                # -------- HELP --------
+        # -------- HELP --------
         if text == "အကူညီ" and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
             await message.delete()
             await message.reply_text("""<pre>
@@ -196,7 +179,7 @@ Info
 file
 </pre>""", parse_mode=ParseMode.HTML)
             return
-          
+
         # -------- COMMANDS --------
         if text.startswith("All"):
             await call_members_online(client, message, "All", text[3:].strip())
@@ -326,7 +309,7 @@ file
     await app.start()
     print(f"Bot started: {token}")
     await asyncio.Event().wait()
-          
+
 # ---------------- RUN ALL ----------------
 async def main():
     await asyncio.gather(*(run_bot(token) for token in TOKENS if token))
