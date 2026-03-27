@@ -24,22 +24,7 @@ DATA_FILE = "data.json"
 spam_running = {}
 call_running = {}
 
-# ---------------- HELPER ----------------
-async def is_admin_or_owner(client, chat_id: int, user_id: int, bot_admins: list):
-    """
-    Personal chat or group chat, only BOT_ADMINS or OWNER can use the bot
-    """
-    # Owner အမြဲ allowed
-    if user_id == OWNER_ID:
-        return True
-
-    # BOT_ADMINS always allowed
-    if user_id in bot_admins:
-        return True
-
-    # Otherwise, deny
-    return False
-
+# ---------------- HELPERS ----------------
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -67,12 +52,20 @@ def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+async def is_admin_or_owner(client, chat_id: int, user_id: int, bot_admins: list):
+    # OWNER always allowed
+    if user_id == OWNER_ID:
+        return True
+    if user_id in bot_admins:
+        return True
+    return False
+
 # ---------------- CALL FUNCTION ----------------
 async def call_members_online(client, message: Message, mode: str, optional_text: str = ""):
     chat_id = message.chat.id
     user_id = message.from_user.id
     data = load_data()
-    if not is_admin_or_owner(user_id, data["BOT_ADMINS"]):
+    if not await is_admin_or_owner(client, chat_id, user_id, data["BOT_ADMINS"]):
         return
 
     await message.delete()
@@ -111,7 +104,6 @@ async def run_bot(token: str):
     data = load_data()
     app = Client(name=f"bot_{token[:5]}", api_id=API_ID, api_hash=API_HASH, bot_token=token)
 
-    # -------- Welcome --------
     @app.on_message(filters.new_chat_members)
     async def welcome(client, message: Message):
         for user in message.new_chat_members:
@@ -122,197 +114,126 @@ async def run_bot(token: str):
                     save_data(data)
             try:
                 await message.reply_text(f"{mention} ဖာသည်မသားဝင်လာပြီ\n🆔 {user.id}")
-            except:
-                pass
+            except: pass
 
-    # -------- Goodbye --------
     @app.on_message(filters.left_chat_member)
     async def goodbye(client, message: Message):
         user = message.left_chat_member
         mention = f"<a href='tg://user?id={user.id}'>{user.first_name}</a>"
         try:
             await message.reply_text(f"{mention} ဖာသည်မသားထွက်သွားပြီ\n🆔 {user.id}")
-        except:
-            pass
+        except: pass
 
-    # -------- HANDLER --------
     @app.on_message(filters.text)
     async def handler(client, message: Message):
         data = load_data()
         text = message.text or ""
         chat_id = message.chat.id
         user_id = message.from_user.id
-
         if chat_id not in data["spam_speed"]:
             data["spam_speed"][chat_id] = 0.5
 
-        # -------- FILTER --------
         is_admin = await is_admin_or_owner(client, chat_id, user_id, data["BOT_ADMINS"])
         if not is_admin:
-            # Forward check
             if message.forward_from or message.forward_from_chat:
-                await message.delete()
-                return
-            # URL/link check
+                await message.delete(); return
             if message.entities:
                 for ent in message.entities:
-                    if ent.type in ['url', 'text_link']:
-                        await message.delete()
-                        return
+                    if ent.type in ['url','text_link']:
+                        await message.delete(); return
 
-        # -------- HELP --------
-        if text == "အကူညီ" and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
+        # ---------------- HELP ----------------
+        if text == "အကူညီ" and is_admin:
             await message.delete()
             await message.reply_text("""<pre>
 📌 CALL
-All
-Callone
-Call
-ရပ်
+All - mention all member
+Callone - I forget about that
+Call - this too
+
+📌 CALL STOP
+ရပ် - stop calling
 
 📌 SPAM
-mtရိုက်
-ရိုက်သတ်
-ခွင့်လွှတ်လိုက်
+mtရိုက် - mention spam(reply)
+ရိုက်သတ် - normal spam(reply)
+
+📌 SPAM STOP
+ခွင့်လွှတ်လိုက် - stop all spam(reply[I think, I also forget about that too])
+
+📌 SPAM TEXT
+စာထည့် - add spam text
+စာဖြတ် - delete spam text
+စာlist - list of spam text
+
+📌 SPAM SPEED
+အရှိန် - adjust spam speed (0.1sec to 10sec)
 
 📌 ADMIN
-Info
-ပိတ်ထား
-လက်မရားနဲ့
-ပြန်မလာနဲ့
-ပြန်ဝင်ခွင့်ပြု
+Info - show user info(reply)
+ပိတ်ထား - mute(reply)
+လက်မရားနဲ့ - unmute(reply)
+ပြန်မလာနဲ့ - ban(reply)
+ပြန်ဝင်ခွင့်ပြု - unban(reply)
 
 📌 OTHER
-ဘာသာပြန်
-file
+ဘာသာပြန် - translae(reply)
+စာဖြန့် - broadcast
 </pre>""", parse_mode=ParseMode.HTML)
             return
 
-        # -------- COMMANDS --------
-        if text.startswith("All"):
-            await call_members_online(client, message, "All", text[3:].strip())
-        elif text.startswith("Callone"):
-            await call_members_online(client, message, "Callone", text[7:].strip())
-        elif text.startswith("Call"):
-            await call_members_online(client, message, "Call", text[4:].strip())
-        elif text == "ရပ်":
-            await message.delete()
-            call_running[chat_id] = False
-            await message.reply_text("Call ရပ်ပြီးပါပြီသခင်")
-        elif text in ["mtရိုက်","ရိုက်သတ်"] and message.reply_to_message and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
+        # ---------------- COMMANDS ----------------
+        if text.startswith("All"): await call_members_online(client,message,"All",text[3:].strip())
+        elif text.startswith("Callone"): await call_members_online(client,message,"Callone",text[7:].strip())
+        elif text.startswith("Call"): await call_members_online(client,message,"Call",text[4:].strip())
+        elif text == "ရပ်": call_running[chat_id]=False; await message.delete(); await message.reply_text("Call ရပ်ပြီးပါပြီသခင်")
+        elif text in ["mtရိုက်","ရိုက်သတ်"] and message.reply_to_message and is_admin:
             await message.delete()
             user = message.reply_to_message.from_user
-            spam_running[chat_id] = True
+            spam_running[chat_id]=True
             async def spam_worker(tag_user: bool):
                 while spam_running.get(chat_id):
                     for line in data["SPAM_TEXT"]:
-                        if not spam_running.get(chat_id):
-                            break
+                        if not spam_running.get(chat_id): break
                         msg = f"<a href='tg://user?id={user.id}'>{user.first_name}</a>\n{line}" if tag_user else line
-                        await app.send_message(chat_id, msg, parse_mode=ParseMode.HTML)
+                        await app.send_message(chat_id,msg,parse_mode=ParseMode.HTML)
                         await asyncio.sleep(data["spam_speed"][chat_id])
             asyncio.create_task(spam_worker(tag_user=text=="mtရိုက်"))
-        elif text == "ခွင့်လွှတ်လိုက်" and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            spam_running[chat_id] = False
-            await message.reply_text("သခင့်အမိန့်အရဖာသည်မသားကိုလွတ်မြောက်ခွင့်ပေးလိုက်ပါပြီ")
-        elif text.startswith("စာထည့်") and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            new_text = text.replace("စာထည့်","",1).strip()
-            if new_text:
-                data["SPAM_TEXT"].append(new_text)
-                save_data(data)
-                await message.reply_text(f"ထည့်ပြီးပါပြီ:\n{new_text}")
-        elif text.startswith("စာဖြတ်") and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            remove_text = text.replace("စာဖြတ်","",1).strip()
-            if remove_text in data["SPAM_TEXT"]:
-                data["SPAM_TEXT"].remove(remove_text)
-                save_data(data)
-                await message.reply_text(f"ဖြတ်ပြီးပါပြီ:\n{remove_text}")
-            else:
-                await message.reply_text("မတွေ့ပါ။")
-        elif text == "စာlist" and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            msg = "\n".join([f"{i+1}. {line}" for i,line in enumerate(data["SPAM_TEXT"])])
-            await message.reply_text(f"<pre>{msg}</pre>", parse_mode=ParseMode.HTML)
-        elif text.startswith("အရှိန်") and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            try:
-                speed = float(text.split()[1])
-                if 0.1 <= speed <= 10:
-                    data["spam_speed"][chat_id] = speed
-                    save_data(data)
-                    await message.reply_text(f"Spam speed {speed} sec set")
-            except:
-                await message.reply_text("0.1 - 10 sec only")
-        elif text.startswith("ဘာသာပြန်") and message.reply_to_message and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            translated_text = translator.translate(message.reply_to_message.text)
-            await message.reply_text(f"🌐 {translated_text}")
-        elif text.lower() == "file" and message.reply_to_message and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            content = message.reply_to_message.text
-            chat_ids = data.get("GP_CHAT_IDS", [])
-            async for dialog in client.get_dialogs():
-                if dialog.chat.type in ["group", "supergroup"]:
-                    if dialog.chat.id not in chat_ids:
-                        chat_ids.append(dialog.chat.id)
-            for gp_id in chat_ids:
-                try:
-                    await app.send_message(gp_id, f"<pre>{content}</pre>", parse_mode=ParseMode.HTML)
-                    await asyncio.sleep(0.5)
-                except:
-                    pass
-        elif text == "Chatlist" and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            msg = "<b>📡 Connected Groups</b>\n\n"
-            chat_ids = data.get("GP_CHAT_IDS", [])
-            async for dialog in client.get_dialogs():
-                if dialog.chat.type in ["group", "supergroup"]:
-                    if dialog.chat.id not in chat_ids:
-                        chat_ids.append(dialog.chat.id)
-            for gid in chat_ids:
-                try:
-                    chat = await client.get_chat(gid)
-                    msg += f"• <a href='https://t.me/{chat.username}'>{chat.title}</a>\n" if chat.username else f"• {chat.title}\n"
-                except:
-                    pass
-            await message.reply_text(msg, parse_mode=ParseMode.HTML)
-        elif text == "list" and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            msg = "<b>📜 Bot Admins</b>\n\n"
-            owner = await client.get_users(OWNER_ID)
-            msg += f"👑 Owner: <a href='tg://user?id={owner.id}'>{owner.first_name}</a>\n\n"
-            msg += "🔹 Admins:\n"
-            for uid in data["BOT_ADMINS"]:
-                user = await client.get_users(uid)
-                msg += f"• <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
-            await message.reply_text(msg, parse_mode=ParseMode.HTML)
-        elif text == "ပိတ်ထား" and message.reply_to_message and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            await app.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, ChatPermissions(can_send_messages=False))
-        elif text == "လက်မရားနဲ့" and message.reply_to_message and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            await app.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, ChatPermissions(can_send_messages=True))
-        elif text == "ပြန်မလာနဲ့" and message.reply_to_message and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            await app.ban_chat_member(chat_id, message.reply_to_message.from_user.id)
-        elif text == "ပြန်ဝင်ခွင့်ပြု" and message.reply_to_message and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            await app.unban_chat_member(chat_id, message.reply_to_message.from_user.id)
-        elif text == "ထည့်" and message.reply_to_message and user_id == OWNER_ID:
-            await message.delete()
-            data["BOT_ADMINS"].append(message.reply_to_message.from_user.id)
-            save_data(data)
-        elif text == "ဖြုတ်" and message.reply_to_message and user_id == OWNER_ID:
-            await message.delete()
-            if message.reply_to_message.from_user.id in data["BOT_ADMINS"]:
-                data["BOT_ADMINS"].remove(message.reply_to_message.from_user.id)
-                save_data(data)
-        elif text == "Info" and message.reply_to_message and is_admin_or_owner(user_id, data["BOT_ADMINS"]):
-            await message.delete()
-            await message.reply_text(f"👤 {message.reply_to_message.from_user.first_name}\n🆔 {message.reply_to_message.from_user.id}")
+        elif text == "ခွင့်လွှတ်လိုက်" and is_admin: await message.delete(); spam_running[chat_id]=False; await message.reply_text("သခင့်အမိန့်အရဖာသည်မသားကိုလွတ်မြောက်ခွင့်ပေးလိုက်ပါပြီ")
+        elif text.startswith("စာထည့်") and is_admin: new_text = text.replace("စာထည့်","",1).strip(); await message.delete(); data["SPAM_TEXT"].append(new_text); save_data(data); await message.reply_text(f"ထည့်ပြီးပါပြီ:\n{new_text}")
+        elif text.startswith("စာဖြတ်") and is_admin: remove_text = text.replace("စာဖြတ်","",1).strip(); await message.delete(); 
+            if remove_text in data["SPAM_TEXT"]: data["SPAM_TEXT"].remove(remove_text); save_data(data); await message.reply_text(f"ဖြတ်ပြီးပါပြီ:\n{remove_text}") 
+            else: await message.reply_text("မတွေ့ပါ။")
+        elif text == "စာlist" and is_admin: await message.delete(); await message.reply_text(f"<pre>{chr(10).join(data['SPAM_TEXT'])}</pre>",parse_mode=ParseMode.HTML)
+        elif text.startswith("အရှိန်") and is_admin: await message.delete(); 
+            try: speed = float(text.split()[1]); 
+            if 0.1<=speed<=10: data["spam_speed"][chat_id]=speed; save_data(data); await message.reply_text(f"Spam speed {speed} sec set") 
+            except: await message.reply_text("0.1 - 10 sec only")
+        elif text.startswith("ဘာသာပြန်") and message.reply_to_message and is_admin: await message.delete(); await message.reply_text(f"🌐 {translator.translate(message.reply_to_message.text)}")
+        elif text.startswith("စာဖြန့်") and message.reply_to_message and is_admin: await message.delete(); content=message.reply_to_message.text; chat_ids=data.get("GP_CHAT_IDS",[]); async for dialog in client.get_dialogs(): 
+            if dialog.chat.type in ["group","supergroup"]: 
+                if dialog.chat.id not in chat_ids: chat_ids.append(dialog.chat.id) 
+            for gp_id in chat_ids: 
+                try: await app.send_message(gp_id,f"<pre>{content}</pre>",parse_mode=ParseMode.HTML); await asyncio.sleep(0.5)
+                except: pass
+        elif text == "Chatlist" and is_admin: await message.delete(); msg="<b>📡 Connected Groups</b>\n\n"; chat_ids=data.get("GP_CHAT_IDS",[]); async for dialog in client.get_dialogs(): 
+            if dialog.chat.type in ["group","supergroup"]: 
+                if dialog.chat.id not in chat_ids: chat_ids.append(dialog.chat.id) 
+            for gid in chat_ids: 
+                try: chat=await client.get_chat(gid); msg+=f"• <a href='https://t.me/{chat.username}'>{chat.title}</a>\n" if chat.username else f"• {chat.title}\n"
+                except: pass
+            await message.reply_text(msg,parse_mode=ParseMode.HTML)
+        elif text == "List" and is_admin: await message.delete(); msg="<b>📜 Bot Admins</b>\n\n"; owner=await client.get_users(OWNER_ID); msg+=f"👑 Owner: <a href='tg://user?id={owner.id}'>{owner.first_name}</a>\n\n"; msg+="🔹 Admins:\n"; 
+            for uid in data["BOT_ADMINS"]: user=await client.get_users(uid); msg+=f"• <a href='tg://user?id={user.id}'>{user.first_name}</a>\n"
+            await message.reply_text(msg,parse_mode=ParseMode.HTML)
+        elif text == "ပိတ်ထား" and message.reply_to_message and is_admin: await message.delete(); await app.restrict_chat_member(chat_id,message.reply_to_message.from_user.id,ChatPermissions(can_send_messages=False))
+        elif text == "လက်မရားနဲ့" and message.reply_to_message and is_admin: await message.delete(); await app.restrict_chat_member(chat_id,message.reply_to_message.from_user.id,ChatPermissions(can_send_messages=True))
+        elif text == "ပြန်မလာနဲ့" and message.reply_to_message and is_admin: await message.delete(); await app.ban_chat_member(chat_id,message.reply_to_message.from_user.id)
+        elif text == "ပြန်ဝင်ခွင့်ပြု" and message.reply_to_message and is_admin: await message.delete(); await app.unban_chat_member(chat_id,message.reply_to_message.from_user.id)
+        elif text == "ထည့်" and message.reply_to_message and user_id==OWNER_ID: await message.delete(); data["BOT_ADMINS"].append(message.reply_to_message.from_user.id); save_data(data)
+        elif text == "ဖြုတ်" and message.reply_to_message and user_id==OWNER_ID: await message.delete(); 
+            if message.reply_to_message.from_user.id in data["BOT_ADMINS"]: data["BOT_ADMINS"].remove(message.reply_to_message.from_user.id); save_data(data)
+        elif text == "Info" and message.reply_to_message and is_admin: await message.delete(); await message.reply_text(f"👤 {message.reply_to_message.from_user.first_name}\n🆔 {message.reply_to_message.from_user.id}")
 
     await app.start()
     print(f"Bot started: {token}")
