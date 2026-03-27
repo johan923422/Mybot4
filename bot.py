@@ -22,7 +22,7 @@ DATA_FILE = "data.json"
 
 # ---------------- GLOBAL STATE ----------------
 spam_running = {}
-call_running = {
+call_running = {}
 
 # ---------------- HELPER ----------------
 async def is_bot_admin_or_owner(client, chat_id: int, user_id: int, bot_admins: list):
